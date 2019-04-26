@@ -48,7 +48,7 @@ class Tokenizer {
         return Integer.parseInt(sb.toString());
     }
 
-    private String string() {
+    private byte[] string() {
         var stringLengthSb = new StringBuilder().append((char) bytes[current]);
 
         char next;
@@ -57,10 +57,10 @@ class Tokenizer {
 
         var stringLength = Integer.parseInt(stringLengthSb.toString());
 
-        var stringSb = new StringBuilder(stringLength);
+        var stringBytes = new byte[stringLength];
         for (int i = 0; i < stringLength; i++)
-            stringSb.append((char) bytes[++current]);
+            stringBytes[i] = bytes[++current];
 
-        return stringSb.toString();
+        return stringBytes;
     }
 }

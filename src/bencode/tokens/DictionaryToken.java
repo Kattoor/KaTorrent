@@ -2,8 +2,8 @@ package bencode.tokens;
 
 import java.util.Map;
 
-public class DictionaryToken extends Token<Map<Token, Token>> {
-    public DictionaryToken(Map<Token, Token> value) {
+public class DictionaryToken extends Token<Map<String, Token>> {
+    public DictionaryToken(Map<String, Token> value) {
         super(value);
     }
 }

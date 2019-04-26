@@ -5,17 +5,32 @@ import bencode.tokens.EndToken;
 import bencode.tokens.ListToken;
 import bencode.tokens.Token;
 
+import java.io.ByteArrayOutputStream;
+import java.nio.charset.StandardCharsets;
+import java.util.ArrayList;
+import java.util.Comparator;
+import java.util.Map;
 import java.util.Stack;
+
+import static bencode.Utils.getBytesFor;
+import static bencode.Utils.getStringFor;
 
 public class BEncode {
 
-    private final byte[] bytes;
-
-    public BEncode(byte[] bytes) {
-        this.bytes = bytes;
+    private void writeBytesTo(ByteArrayOutputStream out, byte[]... bytesFlow) {
+        for (byte[] bytes : bytesFlow) {
+            out.writeBytes(bytes);
+        }
     }
 
-    public Token decode() {
+    private byte[] concatByteArrays(byte[]... bytesArrays) {
+        ByteArrayOutputStream out = new ByteArrayOutputStream();
+        for (byte[] bytes : bytesArrays)
+            out.writeBytes(bytes);
+        return out.toByteArray();
+    }
+
+    public Token decode(byte[] bytes) {
         var tokens = new Tokenizer(bytes).scanTokens();
 
         var containerStack = new Stack<Token>();
@@ -37,7 +52,7 @@ public class BEncode {
                     ((ListToken) container).getValue().add(token);
                 } else if (container instanceof DictionaryToken) {
                     var nextToken = tokens.get(++i);
-                    ((DictionaryToken) container).getValue().put(token, nextToken);
+                    ((DictionaryToken) container).getValue().put(getStringFor((byte[]) token.getValue()), nextToken);
                     if (nextToken.isContainer())
                         containerStack.push(nextToken);
                 }
@@ -45,5 +60,59 @@ public class BEncode {
         }
 
         return tokens.get(0);
+    }
+
+    public byte[] encode(Token token) {
+        var out = new ByteArrayOutputStream();
+
+        if (token.isContainer()) {
+            if (token instanceof ListToken) {
+                var childTokens = ((ListToken) token).getValue();
+
+                var childBytes = childTokens.stream()
+                        .map(this::encode)
+                        .reduce(new byte[]{}, this::concatByteArrays);
+
+                writeBytesTo(out,
+                        getBytesFor("l"),
+                        childBytes,
+                        getBytesFor("e"));
+            } else if (token instanceof DictionaryToken) {
+                var childEntries = ((DictionaryToken) token).getValue();
+                var entryList = new ArrayList<>(childEntries.entrySet());
+
+                entryList.sort(Comparator.comparing(Map.Entry::getKey));
+
+                var childBytes = entryList.stream()
+                        .map(entry ->
+                                concatByteArrays(
+                                        getBytesFor(Integer.toString(entry.getKey().length())),
+                                        getBytesFor(":"),
+                                        getBytesFor(entry.getKey()),
+                                        encode(entry.getValue())))
+                        .reduce(new byte[]{}, this::concatByteArrays);
+
+                writeBytesTo(out,
+                        getBytesFor("d"),
+                        childBytes,
+                        getBytesFor("e"));
+            }
+        } else {
+            Object value = token.getValue();
+            if (value instanceof byte[]) {
+                var bytesValue = (byte[]) value;
+                writeBytesTo(out,
+                        getBytesFor(Integer.toString((getStringFor(bytesValue)).length())),
+                        getBytesFor(":"),
+                        bytesValue);
+            } else if (value instanceof Integer) {
+                writeBytesTo(out,
+                        getBytesFor("i"),
+                        getBytesFor(Integer.toString((Integer) value)),
+                        getBytesFor("e"));
+            }
+        }
+
+        return out.toByteArray();
     }
 }
