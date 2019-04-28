@@ -1,36 +1,29 @@
-import bencode.BEncode;
-import bencode.Utils;
 import bencode.tokens.DictionaryToken;
 import bencode.tokens.Token;
 
 import java.io.IOException;
-import java.net.URLEncoder;
 import java.nio.file.Files;
 import java.nio.file.Paths;
-import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
-import java.util.HashMap;
 
-import static bencode.Utils.getStringFor;
+import static bencode.Utils.*;
 
 public class Main {
 
     public static void main(String[] args) throws IOException, NoSuchAlgorithmException {
-        new Main();
+        var file = Files.readAllBytes(Paths.get("ubuntu.torrent"));
+
+        var root = (DictionaryToken) Token.decode(file).getDecodedToken();
+        var info = (DictionaryToken) root.getValue().get("info");
+        var announce = getStringFor((byte[]) root.getValue().get("announce").getValue());
+
+        if (!prepareUrl(announce, info.encode()).equals("http://torrent.ubuntu.com:6969/file?info_hash=%B7%B0%FB%ABt%A8%5DJ%C1pf%2CdY%82%A8b%82dU"))
+            throw new RuntimeException("Mistakes were made");
     }
 
-    private Main() throws IOException, NoSuchAlgorithmException {
-        var bEncode = new BEncode();
-
-        var rootDict = bEncode.decode(Files.readAllBytes(Paths.get("ubuntu.torrent")));
-
-        var infoDict = (DictionaryToken) ((DictionaryToken) rootDict).getValue().get("info");
-
-        var encodedInfoDict = bEncode.encode(infoDict);
-
-        var announce = new String((byte[]) ((Token) ((HashMap) rootDict.getValue()).get("announce")).getValue());
-        var infoHash = URLEncoder.encode(getStringFor(MessageDigest.getInstance("SHA-1").digest(encodedInfoDict)), Utils.CHARSET);
-
-        System.out.printf("%s?info_hash=%s", announce.replace("announce", "file"), infoHash);
+    private static String prepareUrl(String announce, byte[] encodedInfo) throws NoSuchAlgorithmException {
+        return String.format("%s?info_hash=%s",
+                announce.replace("announce", "file"),
+                urlEncode(getStringFor(hash(encodedInfo))));
     }
 }
